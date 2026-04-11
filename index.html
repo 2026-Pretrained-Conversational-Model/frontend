@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chatbot</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0d0d0d;
+      --surface: #161616;
+      --surface-2: #1e1e1e;
+      --border: rgba(255,255,255,0.07);
+      --border-hover: rgba(255,255,255,0.14);
+      --text: #f0ede8;
+      --text-muted: rgba(240,237,232,0.45);
+      --accent: #c8f76a;
+      --accent-dim: rgba(200,247,106,0.12);
+      --accent-dim2: rgba(200,247,106,0.06);
+      --user-bubble: #1e2a10;
+      --user-bubble-border: rgba(200,247,106,0.2);
+      --danger: #ff6b6b;
+      --radius: 16px;
+      --radius-sm: 10px;
+      --font: 'DM Sans', sans-serif;
+      --mono: 'DM Mono', monospace;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 15px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Layout ── */
+    .app {
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      height: 100dvh;
+      max-width: 860px;
+      margin: 0 auto;
+    }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 24px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .logo {
+      font-size: 15px;
+      font-weight: 500;
+      letter-spacing: -0.01em;
+    }
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--text-muted);
+      font-family: var(--mono);
+    }
+    .status-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: #555;
+      transition: background 0.4s;
+    }
+    .status-dot.connected { background: var(--accent); }
+    .status-dot.connecting { background: #f5a623; animation: pulse 1s infinite; }
+    .status-dot.error { background: var(--danger); }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.75); }
+    }
+
+    /* ── Messages area ── */
+    .messages {
+      overflow-y: auto;
+      padding: 28px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      scroll-behavior: smooth;
+    }
+    .messages::-webkit-scrollbar { width: 4px; }
+    .messages::-webkit-scrollbar-track { background: transparent; }
+    .messages::-webkit-scrollbar-thumb { background: var(--border-hover); border-radius: 4px; }
+
+    /* ── Empty state ── */
+    .empty-state {
+      margin: auto;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      opacity: 0;
+      animation: fadeUp 0.6s 0.2s forwards;
+    }
+    .empty-icon {
+      width: 56px; height: 56px;
+      border-radius: 18px;
+      background: var(--accent-dim);
+      border: 1px solid var(--user-bubble-border);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+    }
+    .empty-state h2 { font-size: 20px; font-weight: 500; letter-spacing: -0.02em; }
+    .empty-state p { font-size: 14px; color: var(--text-muted); max-width: 280px; }
+    .suggestions {
+      display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 8px;
+    }
+    .suggestion-btn {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 8px 14px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-family: var(--font);
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s, background 0.2s;
+    }
+    .suggestion-btn:hover { border-color: var(--border-hover); color: var(--text); background: var(--surface-2); }
+
+    /* ── Message bubbles ── */
+    .msg {
+      display: flex; flex-direction: column; gap: 6px;
+      max-width: 82%;
+      animation: fadeUp 0.3s ease forwards;
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .msg.user { align-self: flex-end; align-items: flex-end; }
+    .msg.assistant { align-self: flex-start; align-items: flex-start; }
+
+    .bubble {
+      padding: 12px 16px;
+      border-radius: var(--radius);
+      font-size: 14.5px;
+      line-height: 1.65;
+      word-break: break-word;
+    }
+    .msg.user .bubble {
+      background: var(--user-bubble);
+      border: 1px solid var(--user-bubble-border);
+      border-bottom-right-radius: 4px;
+      color: #d8f0a8;
+    }
+    .msg.assistant .bubble {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-bottom-left-radius: 4px;
+      color: var(--text);
+    }
+
+    .typing-bubble { display: flex; align-items: center; gap: 5px; padding: 14px 16px; }
+    .typing-dot {
+      width: 6px; height: 6px;
+      background: var(--text-muted);
+      border-radius: 50%;
+      animation: bounce 1.2s ease-in-out infinite;
+    }
+    .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes bounce {
+      0%, 80%, 100% { transform: translateY(0); }
+      40% { transform: translateY(-6px); }
+    }
+
+    .msg-meta { font-size: 11px; color: var(--text-muted); font-family: var(--mono); padding: 0 4px; }
+
+    .file-chip {
+      display: inline-flex; align-items: center; gap: 7px;
+      background: var(--accent-dim2);
+      border: 1px solid rgba(200,247,106,0.15);
+      border-radius: 8px; padding: 5px 10px;
+      font-size: 12px; color: var(--accent); margin-bottom: 6px;
+    }
+    .file-chip svg { flex-shrink: 0; }
+
+    /* ── Input area ── */
+    .input-area { padding: 16px 24px 24px; border-top: 1px solid var(--border); }
+
+    .file-preview { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+    .file-tag {
+      display: flex; align-items: center; gap: 6px;
+      background: var(--accent-dim); border: 1px solid var(--user-bubble-border);
+      border-radius: 8px; padding: 5px 10px; font-size: 12px; color: var(--accent); max-width: 200px;
+    }
+    .file-tag span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .file-tag-remove {
+      cursor: pointer; opacity: 0.6; transition: opacity 0.15s; flex-shrink: 0;
+      background: none; border: none; color: var(--accent); font-size: 14px; line-height: 1; padding: 0;
+    }
+    .file-tag-remove:hover { opacity: 1; }
+
+    .input-box {
+      display: flex; align-items: flex-end; gap: 10px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 10px 12px; transition: border-color 0.2s;
+    }
+    .input-box:focus-within { border-color: var(--border-hover); }
+
+    .attach-btn {
+      flex-shrink: 0; width: 34px; height: 34px;
+      background: transparent; border: 1px solid var(--border); border-radius: var(--radius-sm);
+      color: var(--text-muted); cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: border-color 0.2s, color 0.2s, background 0.2s;
+    }
+    .attach-btn:hover { border-color: var(--border-hover); color: var(--accent); background: var(--accent-dim2); }
+
+    #chat-input {
+      flex: 1; background: transparent; border: none; outline: none;
+      color: var(--text); font-family: var(--font); font-size: 14.5px;
+      line-height: 1.5; resize: none; min-height: 22px; max-height: 160px; overflow-y: auto;
+    }
+    #chat-input::placeholder { color: var(--text-muted); }
+    #chat-input::-webkit-scrollbar { width: 3px; }
+    #chat-input::-webkit-scrollbar-thumb { background: var(--border); }
+
+    .send-btn {
+      flex-shrink: 0; width: 34px; height: 34px;
+      background: var(--accent); border: none; border-radius: var(--radius-sm);
+      color: #0d0d0d; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: opacity 0.2s, transform 0.15s;
+    }
+    .send-btn:hover:not(:disabled) { opacity: 0.88; }
+    .send-btn:active:not(:disabled) { transform: scale(0.93); }
+    .send-btn:disabled { opacity: 0.25; cursor: not-allowed; }
+
+    .input-hint { margin-top: 8px; font-size: 11px; color: var(--text-muted); text-align: center; }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed; bottom: 28px; left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: var(--surface-2); border: 1px solid var(--border);
+      color: var(--text); font-size: 13px; padding: 10px 18px;
+      border-radius: 24px; opacity: 0; pointer-events: none;
+      transition: opacity 0.25s, transform 0.25s; z-index: 100; white-space: nowrap;
+    }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    #toast.error { border-color: rgba(255,107,107,0.4); color: var(--danger); }
+
+    .upload-spinner {
+      display: inline-block; width: 12px; height: 12px;
+      border: 2px solid rgba(200,247,106,0.3); border-top-color: var(--accent);
+      border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <div class="logo">Chatbot</div>
+    <div class="status-badge">
+      <div class="status-dot connecting" id="status-dot"></div>
+      <span id="status-text">연결 중...</span>
+    </div>
+  </header>
+
+  <div class="messages" id="messages">
+    <div class="empty-state" id="empty-state">
+      <div class="empty-icon">💬</div>
+      <h2>무엇이든 물어보세요</h2>
+      <p>파일을 첨부하거나 아래 질문을 눌러 시작하세요</p>
+      <div class="suggestions">
+        <button class="suggestion-btn" onclick="fillInput(this)">어떤 걸 도와줄 수 있어?</button>
+        <button class="suggestion-btn" onclick="fillInput(this)">파일 분석을 부탁해</button>
+        <button class="suggestion-btn" onclick="fillInput(this)">아이디어 브레인스토밍</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="input-area">
+    <div class="file-preview" id="file-preview"></div>
+    <div class="input-box">
+      <button class="attach-btn" id="attach-btn" title="파일 첨부">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66L9.41 17.41a2 2 0 01-2.83-2.83l8.49-8.49"/>
+        </svg>
+      </button>
+      <input type="file" id="file-input" style="display:none" multiple />
+      <textarea id="chat-input" rows="1" placeholder="메시지를 입력하세요..."></textarea>
+      <button class="send-btn" id="send-btn" disabled title="전송 (Enter)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>
+        </svg>
+      </button>
+    </div>
+    <div class="input-hint">Enter로 전송 · Shift+Enter로 줄바꿈</div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script type="module">
+  import { ChatWebSocket, uploadFile, validateFile, buildTextMessage, buildFileMessage, CONFIG } from './api.js';
+
+  // ── 상태 ──────────────────────────────────
+  const sessionId = crypto.randomUUID();
+  let pendingFiles = [];
+  let isWaiting = false;
+
+  // ── DOM refs ──────────────────────────────
+  const messagesEl  = document.getElementById('messages');
+  const inputEl     = document.getElementById('chat-input');
+  const sendBtn     = document.getElementById('send-btn');
+  const attachBtn   = document.getElementById('attach-btn');
+  const fileInput   = document.getElementById('file-input');
+  const filePreview = document.getElementById('file-preview');
+  const statusDot   = document.getElementById('status-dot');
+  const statusText  = document.getElementById('status-text');
+  const toastEl     = document.getElementById('toast');
+
+  fileInput.accept = CONFIG.ALLOWED_FILE_TYPES.join(',');
+
+  // ── WebSocket ─────────────────────────────
+  const chat = new ChatWebSocket({
+    onOpen()  { setStatus('connected', '연결됨'); updateSendBtn(); },
+    onClose() { setStatus('connecting', '재연결 중...'); updateSendBtn(); },
+    onError() { setStatus('error', '연결 오류'); },
+    onMessage(data) {
+      removeTyping();
+      isWaiting = false;
+      updateSendBtn();
+      if (data.type === 'error') {
+        appendMessage('assistant', data.content || '오류가 발생했습니다.');
+        showToast(data.content || '서버 오류', true);
+        return;
+      }
+      appendMessage('assistant', data.content || data.message || JSON.stringify(data));
+    },
+  });
+  chat.connect();
+
+  // ── Status ────────────────────────────────
+  function setStatus(state, label) {
+    statusDot.className = 'status-dot ' + state;
+    statusText.textContent = label;
+  }
+
+  // ── Input auto-resize ─────────────────────
+  inputEl.addEventListener('input', () => {
+    inputEl.style.height = 'auto';
+    inputEl.style.height = Math.min(inputEl.scrollHeight, 160) + 'px';
+    updateSendBtn();
+  });
+
+  inputEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); trySend(); }
+  });
+
+  sendBtn.addEventListener('click', trySend);
+
+  function updateSendBtn() {
+    const hasText = inputEl.value.trim().length > 0;
+    const uploading = pendingFiles.some(f => f.uploading);
+    sendBtn.disabled = (!hasText && pendingFiles.length === 0)
+      || !chat.isConnected()
+      || isWaiting
+      || uploading;
+  }
+
+  // ── File attach ───────────────────────────
+  attachBtn.addEventListener('click', () => fileInput.click());
+
+  fileInput.addEventListener('change', async () => {
+    const files = Array.from(fileInput.files);
+    fileInput.value = '';
+    for (const file of files) {
+      const check = validateFile(file);
+      if (!check.valid) { showToast(check.error, true); continue; }
+      await addFileToQueue(file);
+    }
+  });
+
+  async function addFileToQueue(file) {
+    const entry = { file, fileId: null, fileName: file.name, uploading: true };
+    pendingFiles.push(entry);
+    renderFilePreviews();
+    updateSendBtn();
+    try {
+      const result = await uploadFile(file);
+      entry.fileId = result.fileId;
+      entry.uploading = false;
+    } catch {
+      showToast(`업로드 실패: ${file.name}`, true);
+      pendingFiles = pendingFiles.filter(f => f !== entry);
+    }
+    renderFilePreviews();
+    updateSendBtn();
+  }
+
+  function renderFilePreviews() {
+    filePreview.innerHTML = '';
+    pendingFiles.forEach((entry, idx) => {
+      const tag = document.createElement('div');
+      tag.className = 'file-tag';
+      tag.innerHTML = `
+        ${entry.uploading
+          ? `<span class="upload-spinner"></span>`
+          : `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>`
+        }
+        <span>${entry.fileName}</span>
+        ${!entry.uploading ? `<button class="file-tag-remove" data-idx="${idx}">×</button>` : ''}
+      `;
+      filePreview.appendChild(tag);
+    });
+    filePreview.querySelectorAll('.file-tag-remove').forEach(btn => {
+      btn.addEventListener('click', () => {
+        pendingFiles.splice(Number(btn.dataset.idx), 1);
+        renderFilePreviews();
+        updateSendBtn();
+      });
+    });
+  }
+
+  // ── Send ──────────────────────────────────
+  async function trySend() {
+    if (sendBtn.disabled) return;
+    const text = inputEl.value.trim();
+    if (!text && pendingFiles.length === 0) return;
+
+    const fileChips = pendingFiles.map(f =>
+      `<div class="file-chip">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+        ${f.fileName}
+      </div>`
+    ).join('');
+
+    appendMessage('user', text, fileChips);
+
+    let payload;
+    if (pendingFiles.length > 0) {
+      const f = pendingFiles[0];
+      payload = buildFileMessage(text, f.fileId, f.fileName, sessionId);
+      if (pendingFiles.length > 1)
+        payload.additionalFiles = pendingFiles.slice(1).map(f => ({ fileId: f.fileId, fileName: f.fileName }));
+    } else {
+      payload = buildTextMessage(text, sessionId);
+    }
+
+    chat.send(payload);
+    isWaiting = true;
+    showTyping();
+
+    inputEl.value = '';
+    inputEl.style.height = 'auto';
+    pendingFiles = [];
+    renderFilePreviews();
+    updateSendBtn();
+  }
+
+  // ── Message rendering ─────────────────────
+  function appendMessage(role, text, chipsHtml = '') {
+    const empty = document.getElementById('empty-state');
+    if (empty) empty.remove();
+
+    const time = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+    const msg = document.createElement('div');
+    msg.className = `msg ${role}`;
+    msg.innerHTML = `
+      <div class="bubble">${chipsHtml}${escapeHtml(text)}</div>
+      <div class="msg-meta">${time}</div>
+    `;
+    messagesEl.appendChild(msg);
+    scrollToBottom();
+  }
+
+  let typingEl = null;
+  function showTyping() {
+    if (typingEl) return;
+    typingEl = document.createElement('div');
+    typingEl.className = 'msg assistant';
+    typingEl.innerHTML = `<div class="bubble typing-bubble">
+      <div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>
+    </div>`;
+    messagesEl.appendChild(typingEl);
+    scrollToBottom();
+  }
+  function removeTyping() { typingEl?.remove(); typingEl = null; }
+
+  // ── Helpers ───────────────────────────────
+  function scrollToBottom() { messagesEl.scrollTop = messagesEl.scrollHeight; }
+  function escapeHtml(str) {
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+  }
+  let toastTimer;
+  function showToast(msg, isError = false) {
+    toastEl.textContent = msg;
+    toastEl.className = 'show' + (isError ? ' error' : '');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { toastEl.className = ''; }, 3000);
+  }
+
+  window.fillInput = (btn) => {
+    inputEl.value = btn.textContent;
+    inputEl.dispatchEvent(new Event('input'));
+    inputEl.focus();
+  };
+</script>
+</body>
+</html>
