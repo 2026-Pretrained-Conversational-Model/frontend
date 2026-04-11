@@ -1,10 +1,10 @@
 # Chatbot Frontend
  
 ## 파일 구조
-'''
+```
 ├── index.html   # 메인 UI
 └── api.js       # 백엔드 연결 설정 (WebSocket, 파일 업로드)
-'''
+```
 
 ## 주요 기능
  
