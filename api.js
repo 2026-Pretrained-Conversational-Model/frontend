@@ -8,10 +8,10 @@
 // ─────────────────────────────────────────
 export const CONFIG = {
   // WebSocket 서버 주소
-  WS_URL: "ws://localhost:8080/ws/chat",
+  WS_URL: "ws://backend:8080/ws/chat",
 
   // 파일 업로드 REST API 주소
-  FILE_UPLOAD_URL: "http://localhost:8080/api/upload",
+  FILE_UPLOAD_URL: "http://backend:8080/api/upload",
 
   // 재연결 설정
   RECONNECT_INTERVAL_MS: 3000,
