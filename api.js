@@ -7,17 +7,14 @@
 // 환경 설정 (배포 시 이 값들을 수정하세요)
 // ─────────────────────────────────────────
 export const CONFIG = {
-  // WebSocket 서버 주소
-  WS_URL: "ws://backend:8080/ws/chat",
+  // 현재 페이지 기준 상대경로로 WS 접속 (nginx가 /ws/chat 을 backend로 프록시)
+  WS_URL: `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws/chat`,
 
-  // 파일 업로드 REST API 주소
-  FILE_UPLOAD_URL: "http://backend:8080/api/upload",
+  // 파일 업로드도 마찬가지로 상대경로
+  FILE_UPLOAD_URL: `${location.origin}/api/upload`,
 
-  // 재연결 설정
   RECONNECT_INTERVAL_MS: 3000,
   MAX_RECONNECT_ATTEMPTS: 5,
-
-  // 허용 파일 타입 및 최대 크기
   ALLOWED_FILE_TYPES: ["image/*", ".pdf", ".txt", ".doc", ".docx", ".xlsx", ".csv"],
   MAX_FILE_SIZE_MB: 20,
 };

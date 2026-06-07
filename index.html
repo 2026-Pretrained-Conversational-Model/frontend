@@ -6,6 +6,7 @@
   <title>Chatbot</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -166,6 +167,67 @@
       color: var(--text);
     }
 
+    /* ── Markdown in assistant bubbles ── */
+    .msg.assistant .bubble p { margin: 0 0 0.6em 0; }
+    .msg.assistant .bubble p:last-child { margin-bottom: 0; }
+    .msg.assistant .bubble strong { font-weight: 600; color: var(--accent); }
+    .msg.assistant .bubble em { font-style: italic; }
+    .msg.assistant .bubble ul,
+    .msg.assistant .bubble ol { margin: 0.4em 0 0.6em 1.4em; padding: 0; }
+    .msg.assistant .bubble li { margin-bottom: 0.2em; }
+    .msg.assistant .bubble h1,
+    .msg.assistant .bubble h2,
+    .msg.assistant .bubble h3 {
+      font-size: 1em; font-weight: 600; margin: 0.8em 0 0.3em 0;
+      color: var(--accent);
+    }
+    .msg.assistant .bubble code {
+      background: rgba(255,255,255,0.06);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: var(--mono);
+      font-size: 0.9em;
+    }
+    .msg.assistant .bubble pre {
+      background: rgba(0,0,0,0.3);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      overflow-x: auto;
+      margin: 0.5em 0;
+    }
+    .msg.assistant .bubble pre code {
+      background: none;
+      padding: 0;
+      font-size: 0.85em;
+      line-height: 1.5;
+    }
+    .msg.assistant .bubble blockquote {
+      border-left: 3px solid var(--accent);
+      padding-left: 12px;
+      margin: 0.5em 0;
+      color: var(--text-muted);
+    }
+    .msg.assistant .bubble table {
+      border-collapse: collapse;
+      margin: 0.5em 0;
+      font-size: 0.9em;
+    }
+    .msg.assistant .bubble th,
+    .msg.assistant .bubble td {
+      border: 1px solid var(--border);
+      padding: 6px 10px;
+      text-align: left;
+    }
+    .msg.assistant .bubble th {
+      background: rgba(255,255,255,0.04);
+      font-weight: 500;
+    }
+    .msg.assistant .bubble a {
+      color: var(--accent);
+      text-decoration: underline;
+    }
+
     .typing-bubble { display: flex; align-items: center; gap: 5px; padding: 14px 16px; }
     .typing-dot {
       width: 6px; height: 6px;
@@ -315,7 +377,7 @@
   import { ChatWebSocket, uploadFile, validateFile, buildTextMessage, buildFileMessage, CONFIG } from './api.js';
 
   // ── 상태 ──────────────────────────────────
-  const sessionId = crypto.randomUUID();
+  const sessionId = generateUUID();
   let pendingFiles = [];
   let isWaiting = false;
 
@@ -355,6 +417,17 @@
   function setStatus(state, label) {
     statusDot.className = 'status-dot ' + state;
     statusText.textContent = label;
+  }
+
+  function generateUUID() {
+    if (window.crypto && typeof window.crypto.randomUUID === "function") {
+      return window.crypto.randomUUID();
+    }
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
+      const r = (Math.random() * 16) | 0;
+      const v = c === "x" ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
   }
 
   // ── Input auto-resize ─────────────────────
@@ -470,6 +543,14 @@
   }
 
   // ── Message rendering ─────────────────────
+  function renderContent(role, text) {
+    if (role === 'assistant') {
+      marked.setOptions({ breaks: true, gfm: true });
+      return marked.parse(text);
+    }
+    return escapeHtml(text);
+  }
+
   function appendMessage(role, text, chipsHtml = '') {
     const empty = document.getElementById('empty-state');
     if (empty) empty.remove();
@@ -478,7 +559,7 @@
     const msg = document.createElement('div');
     msg.className = `msg ${role}`;
     msg.innerHTML = `
-      <div class="bubble">${chipsHtml}${escapeHtml(text)}</div>
+      <div class="bubble">${chipsHtml}${renderContent(role, text)}</div>
       <div class="msg-meta">${time}</div>
     `;
     messagesEl.appendChild(msg);
